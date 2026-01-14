@@ -5,6 +5,8 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
+import Character from '@/components/Character';
+import Zombie from '@/components/Zombie';
 
 type Weapon = {
   id: string;
@@ -15,6 +17,17 @@ type Weapon = {
   level: number;
 };
 
+
+
+type ZombieType = {
+  id: string;
+  health: number;
+  maxHealth: number;
+  x: number;
+  y: number;
+  speed: number;
+};
+
 type Character = {
   id: string;
   name: string;
@@ -23,15 +36,7 @@ type Character = {
   weapon: Weapon;
   dashCooldown: number;
   dashReady: boolean;
-};
-
-type Zombie = {
-  id: string;
-  health: number;
-  maxHealth: number;
-  x: number;
-  y: number;
-  speed: number;
+  isAttacking: boolean;
 };
 
 const WEAPONS: Record<string, Weapon> = {
@@ -45,7 +50,7 @@ const Index = () => {
   const [wave, setWave] = useState(1);
   const [score, setScore] = useState(0);
   const [currency, setCurrency] = useState(100);
-  const [zombies, setZombies] = useState<Zombie[]>([]);
+  const [zombies, setZombies] = useState<ZombieType[]>([]);
   const [characters, setCharacters] = useState<Character[]>([
     {
       id: 'p1',
@@ -55,6 +60,7 @@ const Index = () => {
       weapon: WEAPONS.rifle,
       dashCooldown: 5000,
       dashReady: true,
+      isAttacking: false,
     },
     {
       id: 'p2',
@@ -64,13 +70,14 @@ const Index = () => {
       weapon: WEAPONS.pistol,
       dashCooldown: 5000,
       dashReady: true,
+      isAttacking: false,
     },
   ]);
   const [selectedCharacter, setSelectedCharacter] = useState(0);
 
   const spawnWave = useCallback(() => {
     const zombieCount = 5 + wave * 2;
-    const newZombies: Zombie[] = [];
+    const newZombies: ZombieType[] = [];
     for (let i = 0; i < zombieCount; i++) {
       newZombies.push({
         id: `z-${Date.now()}-${i}`,
@@ -140,6 +147,7 @@ const Index = () => {
         weapon: WEAPONS.rifle,
         dashCooldown: 5000,
         dashReady: true,
+        isAttacking: false,
       },
       {
         id: 'p2',
@@ -149,6 +157,7 @@ const Index = () => {
         weapon: WEAPONS.pistol,
         dashCooldown: 5000,
         dashReady: true,
+        isAttacking: false,
       },
     ]);
     spawnWave();
@@ -163,6 +172,19 @@ const Index = () => {
   const shootZombie = (zombieId: string) => {
     const char = characters[selectedCharacter];
     if (char.health <= 0) return;
+
+    setCharacters((prev) =>
+      prev.map((c, i) =>
+        i === selectedCharacter ? { ...c, isAttacking: true } : c
+      )
+    );
+    setTimeout(() => {
+      setCharacters((prev) =>
+        prev.map((c, i) =>
+          i === selectedCharacter ? { ...c, isAttacking: false } : c
+        )
+      );
+    }, 200);
 
     setZombies((prev) => {
       const updated = prev.map((z) => {
@@ -485,55 +507,69 @@ const Index = () => {
           ))}
         </div>
 
-        <Card className="p-6 bg-card/80 backdrop-blur-xl border-2 border-primary/30 min-h-[400px] relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-muted/20 to-muted/5" />
+        <Card className="p-6 bg-card/80 backdrop-blur-xl border-2 border-primary/30 min-h-[500px] relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-gray-800 via-gray-700 to-gray-900">
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-yellow-600 to-transparent" />
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-yellow-600 to-transparent" />
+              {[...Array(10)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-1 h-full bg-gray-600"
+                  style={{ left: `${i * 10}%` }}
+                />
+              ))}
+              {[...Array(10)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-full h-1 bg-gray-600"
+                  style={{ top: `${i * 10}%` }}
+                />
+              ))}
+            </div>
+            <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-green-900/20 to-transparent" />
+          </div>
           
           <div className="relative">
             {characters.map((char, index) => (
               <div
                 key={char.id}
-                className={`absolute left-1/2 transform -translate-x-1/2 transition-all ${
-                  char.health <= 0 ? 'opacity-30' : ''
-                }`}
+                className="absolute left-1/2 transform -translate-x-1/2 transition-all"
                 style={{ top: `${index === 0 ? 30 : 70}%` }}
               >
-                <div className="text-4xl">{index === 0 ? '🎖️' : '🎯'}</div>
-                {selectedCharacter === index && (
-                  <div className="absolute -top-2 -right-2">
-                    <span className="text-2xl">👆</span>
-                  </div>
-                )}
+                <Character
+                  type={index === 0 ? 'soldier' : 'sniper'}
+                  isActive={selectedCharacter === index}
+                  health={char.health}
+                  maxHealth={char.maxHealth}
+                  isAttacking={char.isAttacking}
+                />
               </div>
             ))}
 
             {zombies.map((zombie) => (
-              <button
+              <div
                 key={zombie.id}
-                onClick={() => shootZombie(zombie.id)}
-                disabled={currentChar.health <= 0}
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 disabled:cursor-not-allowed"
+                className="absolute transform -translate-x-1/2 -translate-y-1/2"
                 style={{
                   left: `${zombie.x}%`,
                   top: `${zombie.y}%`,
                 }}
               >
-                <div className="relative">
-                  <span className="text-4xl">🧟</span>
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-12">
-                    <Progress
-                      value={(zombie.health / zombie.maxHealth) * 100}
-                      className="h-1"
-                    />
-                  </div>
-                </div>
-              </button>
+                <Zombie
+                  health={zombie.health}
+                  maxHealth={zombie.maxHealth}
+                  onClick={() => shootZombie(zombie.id)}
+                  disabled={currentChar.health <= 0}
+                />
+              </div>
             ))}
 
             {zombies.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center space-y-4">
                   <Icon name="CheckCircle" className="mx-auto text-accent" size={64} />
-                  <p className="text-2xl font-bold text-accent">Волна зачищена!</p>
+                  <p className="text-2xl font-bold text-accent drop-shadow-lg">Волна зачищена!</p>
                 </div>
               </div>
             )}
